@@ -41,18 +41,64 @@ function GetZadarmaData($method='', $type='POST', $params=[]) {
 }
 
 
-  // функция возвращает статистику по ВАТС за период $start - $end, фильтр по номеру $sip
+  // функция возвращает общую статистику за период $start - $end, фильтр по номеру $sip
 function GetZadarmaStatistics($start='',$end='',$sip='') {
     // проверка входных данных
   $start = ($start) ? date('Y-m-d 00:00:00',strtotime($start)) : date('Y-m-d 00:00:00');
-  $end = ($end) ? date('Y-m-d 00:00:00',strtotime($end)) : date('Y-m-d 00:00:00');
+  $end = ($end) ? date('Y-m-d 23:59:59',strtotime($end)) : date('Y-m-d 23:59:59');
     // готовим запрос
-  $params = array('from'=>$start, 'to'=>$end);
+  $params = array('start'=>$start, 'end'=>$end);
   if ($sip) $params['sip'] = $sip;
   $stat = GetZadarmaData('/v1/statistics/', 'GET', $params);
   if (!$stat) return false;
   $stat = json_decode($stat, true);
   return ('success'==$stat['status']) ? $stat['stats'] : false;
+}
+
+
+  // функция возвращает статистику по ВАТС за период $start - $end
+function GetZadarmaVPBXStatistics($start='',$end='') {
+    // проверка входных данных
+  $start = ($start) ? date('Y-m-d 00:00:00',strtotime($start)) : date('Y-m-d 00:00:00');
+  $end = ($end) ? date('Y-m-d 23:59:59',strtotime($end)) : date('Y-m-d 23:59:59');
+    // готовим запрос
+  $params = array('start'=>$start, 'end'=>$end);
+  $params['version'] = 2;
+  $stat = GetZadarmaData('/v1/statistics/pbx/', 'GET', $params);
+  if (!$stat) return false;
+  $stat = json_decode($stat, true);
+  return ('success'==$stat['status']) ? $stat['stats'] : false;
+}
+
+
+  // функция инициирует звонок с внутреннего $from на номер $to через линию $sip
+function MakeZadarmaCallback($from='',$to='',$sip='') {
+    // проверка входных данных
+  if (!$from || !$to) return false;
+    // запрос
+  $params = array('from'=>$from, 'to'=>$to);
+  if ($sip) $params['sip'] = $sip;
+  $callback = GetZadarmaData('/v1/request/callback/', 'GET', $params);
+  if ($callback) $callback = json_decode($callback, true);
+  else return false;
+  return ('success'==$callback['status']) ? $callback : false;  
+}
+
+
+  // функция возвращает массив ссылок на аудиофайлы записи звонка $pbx_call_id
+function GetCallRecords($pbx_call_id) {
+    // проверка входных данных
+  if (!$pbx_call_id) return false;
+    // запрос
+  $params = array('pbx_call_id'=>$pbx_call_id, 'lifetime'=>5184000);
+  $records = GetZadarmaData('/v1/pbx/record/request/', 'GET', $params);
+  if ($records) $records = json_decode($records, true);
+  else return false;
+  if ('success'!=$records['status']) return false;
+    // собираем массив $tmp со ссылками на файлы
+  if ($records['link']) $tmp[] = $records['link'];
+  foreach ($records['links'] as $link) $tmp[] = $link;
+  return $tmp;  
 }
 
 
